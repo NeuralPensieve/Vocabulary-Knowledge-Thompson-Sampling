@@ -5,8 +5,8 @@ This repository contains a Python implementation of a vocabulary knowledge model
 ## Features
 
 - **Thompson Sampling**: Utilizes Thompson sampling to efficiently estimate user's knowledge level.
-- **Two Model Types**: Bayesian and non-Bayesian models for word difficulty estimation.
-- **Interactive User Input**: Asks the user whether they know a word, with responses affecting the model.
+- **Two Model Types**: Bayesian and non-Bayesian models for distribution estimation.
+- **Interactive User Input**: Asks the user whether they know a sampled word iteratively.
 - **Word Difficulty Estimation**: Estimates the difficulty of words using a probabilistic model.
 - **Data Input**: Reads word-rank data from a CSV file to sample words for user input.
 - **Customizable Configuration**: Control parameters such as number of iterations, model type, and initial priors.

@@ -276,6 +276,7 @@ class VocabularyKnowledgeModel:
         method="bayesian",
         opt_iterations=5_000,
         link_function: str = "logit",
+        verbose: bool = False,
     ):
         """Perform Thompson sampling to efficiently estimate user's knowledge level."""
         x_data = []
@@ -295,21 +296,24 @@ class VocabularyKnowledgeModel:
                     x_data=x_data,
                     y_data=y_data,
                     opt_iterations=opt_iterations,
-                    verbose=True,
+                    verbose=verbose,
                 )
             elif method == "non-bayesian":
                 self.update_posterior_non_bayesian(
                     x_data=x_data,
                     y_data=y_data,
                     opt_iterations=opt_iterations,
-                    verbose=True,
+                    verbose=verbose,
                     link_function=link_function,
                 )
             else:
                 raise ValueError("Invalid method. Must be 'bayesian' or 'non-bayesian'")
 
-            print("*" * 30)
-            print(f"iteration: {itr}")
-            print(f"difficulty: {sampled_difficulty:.0f}. Response: {response}.")
-            print(f"mu: {self.history_mu[-1]:.0f}. std: {self.history_std[-1]:.0f}.")
-            print("*" * 30)
+            if verbose:
+                print("*" * 30)
+                print(f"iteration: {itr}")
+                print(f"difficulty: {sampled_difficulty:.0f}. Response: {response}.")
+                print(
+                    f"mu: {self.history_mu[-1]:.0f}. std: {self.history_std[-1]:.0f}."
+                )
+                print("*" * 30)

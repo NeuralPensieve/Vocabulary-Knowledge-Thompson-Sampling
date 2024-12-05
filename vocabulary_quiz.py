@@ -93,16 +93,3 @@ print(
     f"final mu: {model.history_mu[-1]:.0f}. standard error: {model.history_std[-1] / math.sqrt(config.num_iterations - 1):.0f}."
 )
 print(f"area under curve: {normal_ccdf_area(model.mu0, model.std0, 0, 50_000):.0f}")
-
-# %%
-# ******************************
-# iteration: 49
-# difficulty: 47623. Response: 0.
-# mu: 27339. std: 19335.
-# ******************************
-
-# ******************************
-# iteration: 49
-# difficulty: 38175. Response: 0.
-# mu: 31889. std: 14378.
-# ******************************

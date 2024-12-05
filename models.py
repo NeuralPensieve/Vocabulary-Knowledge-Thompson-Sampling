@@ -10,6 +10,20 @@ import torch
 import torch.nn as nn
 
 
+def probit(x: torch.Tensor) -> torch.Tensor:
+    """
+    Applies the probit function (inverse normal CDF) to input x.
+    """
+    return torch.distributions.Normal(0, 1).icdf(x)
+
+
+def inv_probit(x: torch.Tensor) -> torch.Tensor:
+    """
+    Applies the inverse probit function (normal CDF) to input x.
+    """
+    return torch.distributions.Normal(0, 1).cdf(x)
+
+
 class SimulatedUserEnv:
     def __init__(self, true_mu: float, true_std: float):
         """
@@ -144,40 +158,101 @@ class VocabularyKnowledgeModel:
         self.history_mu.append(mu_constrained)
         self.history_std.append(std)
 
-    def update_posterior_non_bayesian(self, x_data, y_data, opt_iterations, verbose):
+    # def update_posterior_non_bayesian(self, x_data, y_data, opt_iterations, verbose):
+    #     x_data = torch.tensor(x_data, dtype=torch.float32)
+    #     y_data = torch.tensor(y_data, dtype=torch.float32)
+
+    #     # define mu and std as a torch parameter, initialized by self.mu0, and self.std0
+    #     mu_init = torch.logit(torch.tensor(self.mu0 / self.upper_bound))
+    #     std_init = torch.log(torch.tensor(self.std0))
+
+    #     mu = nn.Parameter(mu_init)
+    #     std = nn.Parameter(std_init)
+
+    #     # define the loss function
+    #     loss_fn = torch.nn.BCELoss()
+
+    #     # define the optimizer
+    #     optimizer = torch.optim.Adam([mu, std], lr=0.001)
+
+    #     # train the model
+    #     pbar = tqdm.trange(
+    #         opt_iterations, desc="Training", leave=True, disable=not verbose
+    #     )
+    #     for step in pbar:
+    #         optimizer.zero_grad()
+
+    #         # scaling mu and std
+    #         mu_constrained = torch.sigmoid(mu) * self.upper_bound
+    #         std_constrained = torch.exp(std)
+
+    #         # forward pass
+    #         logits = -(x_data - mu_constrained) / (std_constrained + 1e-8)
+    #         y_pred = torch.sigmoid(logits)
+    #         loss = loss_fn(y_pred, y_data)
+
+    #         # backward pass
+    #         loss.backward(retain_graph=True)
+    #         optimizer.step()
+
+    #         mu_constrained = mu_constrained.detach()
+    #         std_constrained = std_constrained.detach()
+
+    #         pbar.set_postfix({"loss": f"{loss.detach().item():.4f}"})
+    # # Store final transformed values
+    # with torch.no_grad():
+    #     self.mu0 = mu_constrained.item()
+    #     self.std0 = std_constrained.item()
+
+    #     self.history_mu.append(self.mu0)
+    #     self.history_std.append(self.std0)
+
+    def update_posterior_non_bayesian(
+        self,
+        x_data,
+        y_data,
+        opt_iterations: int,
+        verbose: bool,
+        link_function: str = "logit",
+    ) -> None:
         x_data = torch.tensor(x_data, dtype=torch.float32)
         y_data = torch.tensor(y_data, dtype=torch.float32)
 
-        # define mu and std as a torch parameter, initialized by self.mu0, and self.std0
-        mu_init = torch.logit(torch.tensor(self.mu0 / self.upper_bound))
+        # Choose transform functions based on link function
+        if link_function == "logit":
+            transform = torch.logit
+            inv_transform = torch.sigmoid
+        elif link_function == "probit":
+            transform = probit
+            inv_transform = inv_probit
+        else:
+            raise ValueError("link_function must be either 'logit' or 'probit'")
+
+        # Initialize parameters using selected transform
+        mu_init = transform(torch.tensor(self.mu0 / self.upper_bound))
         std_init = torch.log(torch.tensor(self.std0))
 
         mu = nn.Parameter(mu_init)
         std = nn.Parameter(std_init)
 
-        # define the loss function
         loss_fn = torch.nn.BCELoss()
-
-        # define the optimizer
         optimizer = torch.optim.Adam([mu, std], lr=0.001)
 
-        # train the model
         pbar = tqdm.trange(
             opt_iterations, desc="Training", leave=True, disable=not verbose
         )
         for step in pbar:
             optimizer.zero_grad()
 
-            # scaling mu and std
-            mu_constrained = torch.sigmoid(mu) * self.upper_bound
+            # Transform parameters to constrained space
+            mu_constrained = inv_transform(mu) * self.upper_bound
             std_constrained = torch.exp(std)
 
-            # forward pass
-            logits = -(x_data - mu_constrained) / (std_constrained + 1e-8)
-            y_pred = torch.sigmoid(logits)
+            # Calculate predictions using selected transform
+            z_scores = -(x_data - mu_constrained) / (std_constrained + 1e-8)
+            y_pred = inv_transform(z_scores)
             loss = loss_fn(y_pred, y_data)
 
-            # backward pass
             loss.backward(retain_graph=True)
             optimizer.step()
 
@@ -200,6 +275,7 @@ class VocabularyKnowledgeModel:
         num_iterations=50,
         method="bayesian",
         opt_iterations=5_000,
+        link_function: str = "logit",
     ):
         """Perform Thompson sampling to efficiently estimate user's knowledge level."""
         x_data = []
@@ -216,13 +292,18 @@ class VocabularyKnowledgeModel:
 
             if method == "bayesian":
                 self.update_posterior_bayesian(
-                    x_data=x_data, y_data=y_data, opt_iterations=opt_iterations
+                    x_data=x_data,
+                    y_data=y_data,
+                    opt_iterations=opt_iterations,
+                    verbose=True,
                 )
             elif method == "non-bayesian":
                 self.update_posterior_non_bayesian(
                     x_data=x_data,
                     y_data=y_data,
                     opt_iterations=opt_iterations,
+                    verbose=True,
+                    link_function=link_function,
                 )
             else:
                 raise ValueError("Invalid method. Must be 'bayesian' or 'non-bayesian'")
